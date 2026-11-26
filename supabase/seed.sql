@@ -37,6 +37,8 @@ on conflict (institution_id, holiday_date) do nothing;
 -- ----------------------------------------------------------------------------
 -- Auth users (local only). Passwords are bcrypt-hashed with pgcrypto.
 -- ----------------------------------------------------------------------------
+alter table auth.users disable trigger on_auth_user_created;
+
 insert into auth.users
   (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
    raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -96,6 +98,8 @@ values
                       'institution_id', '11111111-1111-4111-8111-111111111111'),
    jsonb_build_object('first_name', 'Mehdi', 'last_name', 'Alaoui', 'role', 'student'), now(), now())
 on conflict (id) do nothing;
+
+alter table auth.users enable trigger on_auth_user_created;
 
 insert into auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at)
 select

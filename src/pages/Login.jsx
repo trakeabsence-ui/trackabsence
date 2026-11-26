@@ -1,8 +1,9 @@
+import { useAuth } from '../lib/auth'
 import { useState } from 'react'
 import { Icon, LogoMark } from '../components/Icons'
 import { Button, Field } from '../components/ui'
-import { adminUser, currentUser, institution } from '../data/mockData'
-import { navigate } from '../lib/navigation'
+import { institution } from '../data/mockData'
+
 
 const features = [
   { icon: 'qr', text: 'Dynamic QR check-in that rotates every 20 seconds' },
@@ -11,19 +12,45 @@ const features = [
 ]
 
 export default function Login() {
-  const [role, setRole] = useState('teacher')
-  const [email, setEmail] = useState(currentUser.email)
-  const [password, setPassword] = useState('classtrack-demo')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-
-  const selectRole = (nextRole) => {
-    setRole(nextRole)
-    setEmail(nextRole === 'admin' ? adminUser.email : currentUser.email)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const { signIn, resetPassword, authError } = useAuth()
+  const handleSignIn = async (event) => {
+    event.preventDefault()
+    setError('')
+    setMessage('')
+    setLoading(true)
+    try {
+      const { error: err } = await signIn(email, password)
+      if (err) setError(err.message)
+    } catch (err) {
+      setError(err.message || 'Unable to sign in.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const signIn = (event) => {
-    event.preventDefault()
-    navigate(role === 'admin' ? '/admin/dashboard' : '/teacher/dashboard')
+  const handlePasswordReset = async () => {
+    setError('')
+    setMessage('')
+    if (!email.trim()) {
+      setError('Enter your email address first, then request a password reset.')
+      return
+    }
+    setLoading(true)
+    try {
+      const { error: err } = await resetPassword(email.trim())
+      if (err) setError(err.message)
+      else setMessage('If an account exists for that email, a password reset link has been sent.')
+    } catch (err) {
+      setError(err.message || 'Unable to request a password reset.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -99,32 +126,9 @@ export default function Login() {
           </div>
 
           <h2 className="auth-form__title">Welcome back</h2>
-          <p className="auth-form__sub">Sign in to your Northbridge University workspace.</p>
+          <p className="auth-form__sub">Sign in to your {institution.name} workspace.</p>
 
-          <div className="auth-tabs" role="tablist" aria-label="Select role">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={role === 'teacher'}
-              className={role === 'teacher' ? 'is-active' : ''}
-              onClick={() => selectRole('teacher')}
-            >
-              <Icon name="graduation" size={14} />
-              Teacher
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={role === 'admin'}
-              className={role === 'admin' ? 'is-active' : ''}
-              onClick={() => selectRole('admin')}
-            >
-              <Icon name="shield" size={14} />
-              Administrator
-            </button>
-          </div>
-
-          <form onSubmit={signIn}>
+          <form onSubmit={handleSignIn}>
             <div className="stack--sm" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <Field label="Institutional email">
                 <input
@@ -173,21 +177,21 @@ export default function Login() {
             </div>
 
             <div className="auth-form__row">
-              <label className="row" style={{ gap: 7, cursor: 'pointer' }}>
-                <input type="checkbox" className="checkbox" defaultChecked />
-                Keep me signed in
-              </label>
-              <a href="#/login">Forgot password?</a>
+              <span />
+              <a href="#/login" onClick={(event) => { event.preventDefault(); handlePasswordReset() }}>
+                Forgot password?
+              </a>
             </div>
 
-            <Button variant="primary" size="lg" className="btn--block" type="submit" iconRight="arrowRight">
-              Sign in as {role === 'admin' ? 'administrator' : 'teacher'}
+            {(error || message || authError) && (
+              <p role={error || authError ? 'alert' : 'status'} style={{ color: error || authError ? '#DC2626' : '#059669', marginTop: 12 }}>
+                {error || message || authError}
+              </p>
+            )}
+
+            <Button variant="primary" size="lg" className="btn--block" type="submit" disabled={loading} iconRight="arrowRight">
+              {loading ? 'Signing in…' : 'Sign in'}
             </Button>
-
-            <div className="auth-demo">
-              <strong>Demo workspace.</strong> Credentials are prefilled and authentication is
-              simulated. Pick a role above to explore both dashboards.
-            </div>
 
             <div className="row" style={{ marginTop: 18, justifyContent: 'center', gap: 6 }}>
               <span className="tiny muted">Student?</span>
@@ -195,6 +199,10 @@ export default function Login() {
                 Open QR check-in
                 <Icon name="arrowRight" size={12} />
               </a>
+            </div>
+            <div className="row" style={{ marginTop: 12, justifyContent: 'center', gap: 6 }}>
+              <span className="tiny muted">New to ClassTrack?</span>
+              <a href="#/register" className="card-link" style={{ fontSize: 11.5 }}>Create an account</a>
             </div>
           </form>
 

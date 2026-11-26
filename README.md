@@ -10,6 +10,14 @@ React + Vite attendance platform. Product docs live in [`docs/`](./docs), and th
 
 Run locally with `supabase start && supabase db reset`. Do not apply `seed.sql` to production.
 
+## Supabase auth
+
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local` using your Supabase project settings. `.env.local` is ignored by Git; `.env.example` documents the required variable names.
+
+Public registration supports teacher and student accounts. Administrator accounts must be provisioned by a trusted server-side process; a browser-supplied role or authorization code is not trusted.
+
+Before enabling registration on a fresh database, provision one active institution. For multiple institutions, the trusted signup flow must assign the account's institution. Add your app origin to Supabase's allowed redirect URLs for password recovery.
+
 ---
 
 # React + Vite

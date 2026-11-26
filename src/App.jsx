@@ -3,7 +3,10 @@ import { AppShell } from './components/Layout'
 import { navigate, pageTitles } from './lib/navigation'
 import { LogoMark } from './components/Icons'
 import { Button, EmptyState, ToastProvider } from './components/ui'
+import { AuthProvider, useAuth } from './lib/auth'
 import Login from './pages/Login'
+import Register from './pages/Register'
+import ResetPassword from './pages/ResetPassword'
 import CheckIn from './pages/CheckIn'
 import TeacherDashboard from './pages/teacher/Dashboard'
 import TeacherClasses from './pages/teacher/Classes'
@@ -19,11 +22,20 @@ import AdminMonitoring from './pages/admin/Monitoring'
 import AdminReports from './pages/admin/Reports'
 
 function parseRoute() {
-  const raw = window.location.hash.replace(/^#/, '') || '/login'
+  const hashRoute = window.location.hash.replace(/^#/, '')
+  const search = new URLSearchParams(window.location.search)
+  const queryRoute = search.get('route')
+  const raw = hashRoute.startsWith('/')
+    ? hashRoute
+    : queryRoute
+      ? queryRoute
+      : '/login'
   const [pathPart, queryPart] = raw.split('?')
+  const query = queryRoute && raw === queryRoute ? search : new URLSearchParams(queryPart ?? '')
+  if (queryRoute && raw === queryRoute) query.delete('route')
   return {
     path: pathPart || '/login',
-    query: new URLSearchParams(queryPart ?? ''),
+    query,
   }
 }
 
@@ -85,9 +97,64 @@ function StandaloneNotFound() {
   )
 }
 
+function AccountUnavailable({ profile, profileError, signOut }) {
+  const [error, setError] = useState('')
+  const handleSignOut = async () => {
+    setError('')
+    try {
+      const { error: signOutError } = await signOut()
+      if (signOutError) setError(signOutError.message)
+    } catch (signOutError) {
+      setError(signOutError.message || 'Unable to sign out.')
+    }
+  }
+
+  const message =
+    profile?.status === 'invited'
+      ? 'Your account is awaiting activation by your institution.'
+      : profile?.status === 'suspended'
+        ? 'This account has been suspended. Contact your institution for help.'
+        : profileError || 'An active account profile could not be found.'
+
+  return (
+    <div className="auth">
+      <main className="auth__main">
+        <div className="auth-form">
+          <h2 className="auth-form__title">Account access unavailable</h2>
+          <p className="auth-form__sub" role="status">{message}</p>
+          {error && <p role="alert" style={{ color: '#DC2626', marginTop: 12 }}>{error}</p>}
+          <Button variant="primary" size="lg" className="btn--block" onClick={handleSignOut} style={{ marginTop: 16 }}>
+            Sign out
+          </Button>
+        </div>
+      </main>
+    </div>
+  )
+}
+
 function Workspace() {
+  const { session, profile, role, loading, profileError, signOut } = useAuth()
   const [route, setRoute] = useState(parseRoute)
   const { path } = route
+
+  useEffect(() => {
+    if (loading) return
+    if (!session && path !== '/login' && path !== '/register' && path !== '/checkin' && path !== '/reset') {
+      navigate('/login')
+    }
+    if (session && role && (path === '/login' || path === '/register')) {
+      navigate(role === 'admin' ? '/admin/dashboard' : role === 'teacher' ? '/teacher/dashboard' : '/checkin')
+    }
+    if (session && role === 'student' && (path.startsWith('/teacher') || path.startsWith('/admin'))) {
+      navigate('/checkin')
+    }
+    if (session && role === 'teacher' && path.startsWith('/admin')) {
+      navigate('/teacher/dashboard')
+    }
+    if (session && role === 'admin' && path.startsWith('/teacher')) {
+      navigate('/admin/dashboard')
+    }
+  }, [loading, session, role, path])
 
   useEffect(() => {
     const onHashChange = () => setRoute(parseRoute())
@@ -100,14 +167,30 @@ function Workspace() {
     document.title = `${documentTitle(path)} · ClassTrack`
   }, [path])
 
+  if (loading) {
+    return (
+      <div className="auth" role="status">
+        <main className="auth__main">
+          <p className="auth-form__sub">Checking your account…</p>
+        </main>
+      </div>
+    )
+  }
+
+  if (session && (!profile || profile.status !== 'active')) {
+    return <AccountUnavailable profile={profile} profileError={profileError} signOut={signOut} />
+  }
+
   if (path === '/login') return <Login />
+  if (path === '/register') return <Register />
+  if (path === '/reset') return <ResetPassword />
   if (path === '/checkin') return <CheckIn initialCode={route.query.get('code') ?? ''} />
 
   const isTeacher = path === '/teacher' || path.startsWith('/teacher/')
   const isAdmin = path === '/admin' || path.startsWith('/admin/')
   if (!isTeacher && !isAdmin) return <StandaloneNotFound />
 
-  const role = isAdmin ? 'admin' : 'teacher'
+  const viewRole = isAdmin ? 'admin' : 'teacher'
   const base = isAdmin ? '/admin' : '/teacher'
 
   let page
@@ -125,10 +208,10 @@ function Workspace() {
   else if (path === '/admin/monitoring') page = <AdminMonitoring />
   else if (path === '/admin/reports') page = <AdminReports />
   else if (path === '/admin/profile') page = <Profile role="admin" />
-  else page = <NotFound role={role} />
+  else page = <NotFound role={viewRole} />
 
   return (
-    <AppShell role={role} route={path === base ? `${base}/dashboard` : path}>
+    <AppShell role={viewRole} route={path === base ? `${base}/dashboard` : path}>
       {page}
     </AppShell>
   )
@@ -137,7 +220,9 @@ function Workspace() {
 export default function App() {
   return (
     <ToastProvider>
-      <Workspace />
+      <AuthProvider>
+        <Workspace />
+      </AuthProvider>
     </ToastProvider>
   )
 }
