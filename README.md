@@ -1,3 +1,17 @@
+# ClassTrack
+
+React + Vite attendance platform. Product docs live in [`docs/`](./docs), and the Supabase/PostgreSQL implementation lives in [`supabase/`](./supabase).
+
+## Database
+
+- Design and RLS model: [`docs/04-database-design.md`](./docs/04-database-design.md)
+- Migrations: [`supabase/migrations/`](./supabase/migrations)
+- Local fixtures: [`supabase/seed.sql`](./supabase/seed.sql)
+
+Run locally with `supabase start && supabase db reset`. Do not apply `seed.sql` to production.
+
+---
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
